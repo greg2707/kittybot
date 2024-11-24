@@ -1,3 +1,5 @@
+import logging
+import logging.handlers
 import os
 import requests
 
@@ -7,6 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 token = os.getenv('TOKEN')
 my_chat_id = os.getenv('MY_CHAT_ID')
 url = os.getenv('URL')
@@ -14,6 +17,17 @@ second_url = os.getenv('SECOND_URL')
 weather_api_key = os.getenv('WEATHER_API_KEY')
 weather_url = (f'https://api.weatherapi.com/v1/current.json'
                f'?key={weather_api_key}&q=Shanghai')
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+handler = logging.handlers.RotatingFileHandler('logs.log', maxBytes=50000000,
+                                               backupCount=3)
+formatter = logging.Formatter(
+    '%(asctime)s [%(levelname)s] %(message)s - %(funcName)s - %(lineno)s'
+)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 bot = TeleBot(token=token)
@@ -28,7 +42,7 @@ def get_new_img():
     try:
         response = requests.get(url).json()
     except Exception as error:
-        print(error)
+        logger.error(f'Сбой при запросе кота - {error}')
         response = requests.get(second_url).json()
     random_cat = response[0].get('url')
     return random_cat
@@ -43,16 +57,18 @@ def send_new_cat(message):
 @bot.message_handler(commands=['weather'])
 def weather(message):
     chat_id = message.chat.id
+    logger.info(f'weather asked by {chat_id}')
     response = requests.get(weather_url).json()
     weather_info = (f"Температура в Шанхае сейчас: "
                     f"{response['current']['temp_c']}°C "
-                    f"Ощущается как {response['current']['feelslike_c']}")
+                    f"Ощущается как {response['current']['feelslike_c']}°C")
     bot.send_message(chat_id=chat_id, text=weather_info)
 
 
 @bot.message_handler(commands=['help', 'start'])
 def wake_up(message):
     chat = message.chat
+    logger.info(f'bot starts vs {chat.id}')
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(types.KeyboardButton('/newcat'),
                  types.KeyboardButton('/weather'),
@@ -76,6 +92,7 @@ def wake_up(message):
 def about_me(message):
     chat = message.chat
     chat_user = message.from_user
+    logger.info(f'{chat_user.first_name} {chat_user.id} wanted to know about')
     bot.send_message(chat_id=chat.id,
                      text=f'Ваше имя: {chat.first_name} {chat.last_name}.'
                      f' Ваш id - {chat.id}. Ваш username - {chat.username}.'
@@ -84,20 +101,22 @@ def about_me(message):
 
 @bot.message_handler(content_types=['text'])
 def say_hi(message):
-    chat = message.chat
-    chat_id = chat.id
+    chat_id = message.chat.id
+    logger.info(f'text send by {chat_id}')
     bot.send_message(chat_id=chat_id, text='Выберите команду из списка команд')
 
 
 @bot.message_handler(content_types=['sticker', 'dice', 'photo', 'animation'])
 def response_to_sticker(message):
     chat_id = message.chat.id
+    logger.info(f'sticker send by {chat_id}')
     bot.send_message(chat_id=chat_id,
                      text='Давайте не картинки тут слать а выбирать команду')
 
 
 def main():
-    bot.polling(interval=20)
+    # bot.polling(interval=5)
+    bot.infinity_polling(skip_pending=True, logger_level=20)
 
 
 if __name__ == '__main__':
