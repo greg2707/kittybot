@@ -1,0 +1,11 @@
+[Unit]
+Description=tg-kittybot
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/kittybot/
+ExecStart=/root/kittybot/venv/bin/python3 kittybot.py
+
+[Install]
+WantedBy=multi-user.target
